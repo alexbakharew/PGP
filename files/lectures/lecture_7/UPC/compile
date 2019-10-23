@@ -1,0 +1,4 @@
+#!/bin/bash
+np=$1
+shift
+upcc -network=mpi -T=$np $*  
