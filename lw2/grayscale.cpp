@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define NAME_LEN 32
+
+//#define CUDA
+#ifndef CUDA
 struct uchar4
 {
 	int r;
@@ -8,6 +11,10 @@ struct uchar4
 	int b;
 	int alpha;
 };
+#endif
+#define MAX(A,B,C) A > B ? (A > C ? A : C) : (B > C ? B : C) 
+#define MIN(A,B,C) A < B ? (A < C ? A : C) : (B < C ? B : C) 
+
 int main()
 {
 	char input[NAME_LEN];
@@ -21,23 +28,58 @@ int main()
 	
 	fscanf(input_file, "%d %d\n", &width, &height);
 
-	printf("%d %d\n", width, height);
-	unsigned int* image = (unsigned int*) malloc(sizeof(unsigned int) * width * height);
+	uchar4* image = (uchar4*) malloc(sizeof(uchar4) * width * height);
 	
-    if (fread(image, sizeof(unsigned int) * width * height, 1, input_file) != width * height)
+    for(int i = 0; i < width * height; ++i)
 	{
-		printf("Error while reading data from file on line %d\n", __LINE__);
+		char buff[3];
+
+		fread(buff, sizeof(char), 2, input_file);
+		buff[2] = '\0';
+		image[i].r = (int)strtol(buff, NULL, 16);
+
+		fread(buff, sizeof(char), 2, input_file);
+		buff[2] = '\0';
+		image[i].g = (int)strtol(buff, NULL, 16);
+
+		fread(buff, sizeof(char), 2, input_file);
+		buff[2] = '\0';
+		image[i].b = (int)strtol(buff, NULL, 16);
+
+		fread(buff, sizeof(char), 2, input_file);
+		buff[2] = '\0';
+		image[i].alpha = (int)strtol(buff, NULL, 16);
+
+		fgetc(input_file);//skip space or new line
 	}
-    printf("here\n");
-	//uchar4* new_image = (uchar4*)malloc(sizeof(uchar4) * width * height);
+	fclose(input_file);
+	uchar4* new_image = (uchar4*)malloc(sizeof(uchar4) * width * height);
 	
     for(int i = 0; i < width; ++i)
     {
         for(int j = 0; j < height; ++j)
         {
-			printf("%d ", image[i * width + j]);
+			int pos = i * width + j;
+			int res = MAX(image[pos].r, image[pos].g, image[pos].b) + MIN(image[pos].r, image[pos].g, image[pos].b);
+			res /= 2;
+			new_image[pos].r = res;
+			new_image[pos].g = res;
+			new_image[pos].b = res;
+			new_image[pos].alpha = image[pos].alpha;
         }
-		printf("\n");
     }
-    fclose(input_file);
+	FILE* output_file = fopen(output, "w");
+	fprintf(output_file, "%d %d\n", width, height);
+	//fwrite(&width, sizeof(int), 1, output_file);;
+	//fwrite(&height, sizeof(int), 1, output_file);
+	//fwrite(new_image, sizeof(uchar4) + 1, height * width, output_file);
+    char space;
+	for(int i = 0; i < width * height; ++i)
+	{
+		if((i + 1) % width == 0)
+			space = '\n';
+		else
+			space = ' ';
+		fprintf(output_file, "%02X%02X%02X%02X%c", new_image[i].r, new_image[i].g, new_image[i].b, new_image[i].alpha, space);
+	}
 }

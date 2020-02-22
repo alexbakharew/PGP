@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-int main()
-{
-    FILE* file = fopen("in.data", "rb");
-    int w,h;
-    char buffer[1024];
-    fscanf(file, "%d %d\n", &w, &h);
-    printf("%d %d\n", w, h);
-    fread(buffer, sizeof(char), 1024, file);
-    printf("%s\n", buffer);
+int main () {
+   int val;
+   char hex[4];
+   
+   strcpy(hex, "AAA");
+    hex[3] = '\0';
+   val = (int)strtol(hex, NULL, 16);
+   printf("String value = %s, Int value = %d\n", hex, val);
+
+   return(0);
 }
