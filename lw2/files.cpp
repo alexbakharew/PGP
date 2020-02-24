@@ -2,14 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main () {
-   int val;
-   char hex[4];
-   
-   strcpy(hex, "AAA");
-    hex[3] = '\0';
-   val = (int)strtol(hex, NULL, 16);
-   printf("String value = %s, Int value = %d\n", hex, val);
-
-   return(0);
+int main (int argc, char* argv[]) 
+{
+	char name[128];
+	char buff[32];
+	strcpy(name, argv[1]);
+	FILE* file = fopen(argv[1], "rb");
+	if(file == NULL)
+	{
+		printf("Jopa\n");
+	}
+	else
+	{
+		fread(buff, sizeof(char), 32, file);
+		printf("%s\n", buff);
+	}
+	return(0);
 }
