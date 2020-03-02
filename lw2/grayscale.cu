@@ -30,7 +30,7 @@ __global__ void kernel(uchar4 *dst, int w, int h) {
 		for(y = idy; y < h; y += offsety) 
 		{
 			p = tex2D(tex, x, y);
-			int res = (0.299 * p.x) + (0.587 * p.y) + (0.114 * p.z);
+			unsigned char res = (0.299 * p.x) + (0.587 * p.y) + (0.114 * p.z);
 
 			dst[y * w + x] = make_uchar4(res, res, res, p.w);
 		}
@@ -75,39 +75,40 @@ int main(int argc, char* argv[])
 	uchar4 *dev_data;
 	CSC(cudaMalloc(&dev_data, sizeof(uchar4) * height * width));
 
-	//cudaEvent_t start, end;
-	//CSC(cudaEventCreate(&start));
-	//CSC(cudaEventCreate(&end));
-	//CSC(cudaEventRecord(start));
-	kernel<<<dim3(16, 16), dim3(16, 16)>>>(dev_data, width, height);
+	cudaEvent_t start, end;
+	CSC(cudaEventCreate(&start));
+	CSC(cudaEventCreate(&end));
+	CSC(cudaEventRecord(start));
+	kernel<<<dim3(32, 32), dim3(32, 32)>>>(dev_data, width, height);
 	CSC(cudaGetLastError());
 
-	//CSC(cudaEventRecord(end));
-	//CSC(cudaEventSynchronize(end));
-	//float t;
-	//CSC(cudaEventElapsedTime(&t, start, end));
-	//CSC(cudaEventDestroy(start));
-	//CSC(cudaEventDestroy(end));
-	//printf("GPU time = %f\n", t);
+	CSC(cudaEventRecord(end));
+	CSC(cudaEventSynchronize(end));
+	float t;
+	CSC(cudaEventElapsedTime(&t, start, end));
+	CSC(cudaEventDestroy(start));
+	CSC(cudaEventDestroy(end));
+	printf("GPU time = %.2fms\n", t);
 
 	CSC(cudaMemcpy(new_image, dev_data, sizeof(uchar4) * height * width, cudaMemcpyDeviceToHost));
 
-	// clock_t start_time = clock();
-    // for(int i = 0; i < height; ++i)
-    // {
-    //     for(int j = 0; j < width; ++j)
-    //     {
-	// 		int pos = i * width + j;
-	// 		long res = MAX(MAX(image[pos].x, image[pos].y), image[pos].z) + MIN(MIN(image[pos].x, image[pos].y), image[pos].z);
-	// 		res /= 2;
-	// 		new_image[pos].x = res;
-	// 		new_image[pos].y = res;
-	// 		new_image[pos].z = res;
-	// 		new_image[pos].w = image[pos].w;
-    //     }
-	// }
-	// printf("CPU time = %.2fms\n", (double)(clock() - start_time) * 1000 /CLOCKS_PER_SEC);
-	FILE *out = fopen(argv[2], "wb");
+	clock_t start_time = clock();
+    for(int i = 0; i < height; ++i)
+    {
+        for(int j = 0; j < width; ++j)
+        {
+			int pos = i * width + j;
+			long res = MAX(MAX(image[pos].x, image[pos].y), image[pos].z) + MIN(MIN(image[pos].x, image[pos].y), image[pos].z);
+			res /= 2;
+			new_image[pos].x = res;
+			new_image[pos].y = res;
+			new_image[pos].z = res;
+			new_image[pos].w = image[pos].w;
+        }
+	}
+	printf("CPU time = %.2fms\n", (double)(clock() - start_time) * 1000 /CLOCKS_PER_SEC);
+
+	FILE *out = fopen(output, "wb");
 	if(out == NULL)
 	{
 		printf("Error while opening output file\n");
