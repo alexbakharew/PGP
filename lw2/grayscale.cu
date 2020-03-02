@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define NAME_LEN 32
+#define NAME_LEN 128
 
 #define CSC(call)  		\
 do {								\
@@ -30,28 +30,20 @@ __global__ void kernel(uchar4 *dst, int w, int h) {
 		for(y = idy; y < h; y += offsety) 
 		{
 			p = tex2D(tex, x, y);
-			long res = MAX(MAX(p.x, p.y), p.z) + MIN(MIN(p.x, p.y), p.z);
-			res /= 2;
+			int res = (0.299 * p.x) + (0.587 * p.y) + (0.114 * p.z);
 
-			dst[y * w + x].x = res;
-			dst[y * w + x].y = res;
-			dst[y * w + x].z = res;
-			dst[y * w + x].w = p.w;
+			dst[y * w + x] = make_uchar4(res, res, res, p.w);
 		}
 	}
 }
 
 int main(int argc, char* argv[])
 {
-	if(argc != 3)
-	{
-		printf("Usage: ./a.out <input data file> <output data file>\n");
-		exit(-1);
-	}
 	char input[NAME_LEN];
 	char output[NAME_LEN];
-	strcpy(input, argv[1]);
-	strcpy( output, argv[2]);
+
+	scanf("%s", input);
+	scanf("%s", output);
 
 	int width, height;
 	FILE *in = fopen(input, "rb");
@@ -83,29 +75,29 @@ int main(int argc, char* argv[])
 	uchar4 *dev_data;
 	CSC(cudaMalloc(&dev_data, sizeof(uchar4) * height * width));
 
-	cudaEvent_t start, end;
-	CSC(cudaEventCreate(&start));
-	CSC(cudaEventCreate(&end));
-	CSC(cudaEventRecord(start));
+	//cudaEvent_t start, end;
+	//CSC(cudaEventCreate(&start));
+	//CSC(cudaEventCreate(&end));
+	//CSC(cudaEventRecord(start));
 	kernel<<<dim3(16, 16), dim3(16, 16)>>>(dev_data, width, height);
 	CSC(cudaGetLastError());
 
-	CSC(cudaEventRecord(end));
-	CSC(cudaEventSynchronize(end));
-	float t;
-	CSC(cudaEventElapsedTime(&t, start, end));
-	CSC(cudaEventDestroy(start));
-	CSC(cudaEventDestroy(end));
-	printf("time = %f\n", t);
-	
+	//CSC(cudaEventRecord(end));
+	//CSC(cudaEventSynchronize(end));
+	//float t;
+	//CSC(cudaEventElapsedTime(&t, start, end));
+	//CSC(cudaEventDestroy(start));
+	//CSC(cudaEventDestroy(end));
+	//printf("GPU time = %f\n", t);
+
 	CSC(cudaMemcpy(new_image, dev_data, sizeof(uchar4) * height * width, cudaMemcpyDeviceToHost));
 
 	// clock_t start_time = clock();
-    // for(int i = 0; i < width; ++i)
+    // for(int i = 0; i < height; ++i)
     // {
-    //     for(int j = 0; j < height; ++j)
+    //     for(int j = 0; j < width; ++j)
     //     {
-	// 		int pos = i * height + j;
+	// 		int pos = i * width + j;
 	// 		long res = MAX(MAX(image[pos].x, image[pos].y), image[pos].z) + MIN(MIN(image[pos].x, image[pos].y), image[pos].z);
 	// 		res /= 2;
 	// 		new_image[pos].x = res;
@@ -114,8 +106,7 @@ int main(int argc, char* argv[])
 	// 		new_image[pos].w = image[pos].w;
     //     }
 	// }
-	// printf("time : %li\n", clock() - start_time);
-	
+	// printf("CPU time = %.2fms\n", (double)(clock() - start_time) * 1000 /CLOCKS_PER_SEC);
 	FILE *out = fopen(argv[2], "wb");
 	if(out == NULL)
 	{
@@ -127,6 +118,10 @@ int main(int argc, char* argv[])
 	fwrite(&width, sizeof(int), 1, out);
 	fwrite(&height, sizeof(int), 1, out);
 	fwrite(new_image, sizeof(uchar4), width * height, out);
+
+	cudaUnbindTexture(tex);
+	cudaFreeArray(arr);
+	cudaFree(dev_data);
 	fclose(out);
 	free(image);
 	free(new_image);
