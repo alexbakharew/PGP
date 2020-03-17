@@ -36,10 +36,10 @@ int main()
 {
     int n;
     scanf("%d", &n);
-    int** matrix = (int**) malloc(sizeof(int*) * n);
+    double** matrix = (double**) malloc(sizeof(double*) * n);
     for(int i = 0; i < n; ++i)
     {
-        matrix[i] = (int*) malloc(sizeof(int) * n);
+        matrix[i] = (double*) malloc(sizeof(double) * n);
         for(int j = 0; j < n; ++j)
         {
             scanf("%d", &matrix[i][j]);
@@ -49,18 +49,36 @@ int main()
     //transpose(matrix, n);
     print_matrix(matrix, n);
 
-    int** L = (int**) malloc(sizeof(int*) * n);
-    int** U = (int**) malloc(sizeof(int*) * n);
-
+    double** L = (double**) malloc(sizeof(double*) * n);
+    double** U = (double**) malloc(sizeof(double*) * n);
     for(int i = 0; i < n; ++i)
     {
-        int max_ind = i;
-        for(int t = i; t < n; ++t)
+        L[i] = calloc(n, sizeof(double));
+        U[i] = calloc(n, sizeof(double));
+    }
+
+    for(int col = 0; col < n; ++col)
+    {
+        int max_ind = col;
+        for(int t = col; t < n; ++t)
         {
-            if(abs(matrix[t][i]) > abs(matrix[max_ind][i]))
+            if(abs(matrix[t][col]) > abs(matrix[max_ind][col]))
                 max_ind = t;
         }
-        
+        for(int row = col; row < n; ++row)
+        {
+            if(row == max_ind)
+            {
+                L[row][row] = 1.0;
+                continue;
+            }
+            L[row][col] = matrix[row][col] / matrix[max_ind][col];
+
+            for(int i = col; i < n; ++i)
+            {
+                U[row][col] = matrix[row][i] - L[row][col] * matrix[max_ind][i];  
+            }
+        }
         
 
     }
