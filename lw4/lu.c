@@ -5,7 +5,7 @@
 
 void swap(double* lhs, double* rhs)
 {
-    int tmp = *lhs;
+    double tmp = *lhs;
     *lhs = *rhs;
     *rhs = tmp;
 }
@@ -34,6 +34,15 @@ void print_matrix(double** matrix, int size)
         printf("\n");
     }
 }
+long double determinator(double** L, double** U, int size)
+{
+    long double d = 1;
+    for(int i = 0; i < size; ++i)
+    {
+        d *= L[i][i] * U[i][i];
+    }
+    return d;
+}
 int main()
 {
     int n;
@@ -57,11 +66,12 @@ int main()
     double** U = (double**) malloc(sizeof(double*) * n);
     for(int i = 0; i < n; ++i)
     {
-        L[i] = calloc(n, sizeof(double));
+        L[i] = (double*) calloc(n, sizeof(double));
         U[i] = (double*) malloc(sizeof(double) * n);
         memcpy(U[i], matrix[i], n * sizeof(double));
     }
 
+    int sign = 1;
     for(int col = 0; col < n; ++col)
     {
         int max_ind = col;
@@ -73,6 +83,7 @@ int main()
 
         if(max_ind != col)
         {
+            sign *= -1;
             for(int s = col; s < n; ++s)
             {
                 swap(&U[col][s], &U[max_ind][s]);
@@ -87,12 +98,19 @@ int main()
                 L[row][row] = 1.0;
                 continue;
             }
-
-            L[row][col] = U[row][col] / U[col][col];
+            
+            if(U[col][col] != 0)
+                L[row][col] = U[row][col] / U[col][col];
+            else
+            {
+                L[row][col] = 0;
+                continue;
+            }
+            
 
             for(int i = col; i < n; ++i)
             {
-                U[row][i] = U[row][i] - L[row][col] * U[col][i];  
+                U[row][i] -= L[row][col] * U[col][i];  
             }
         }
 
@@ -105,7 +123,7 @@ int main()
     double** res = (double**) malloc(sizeof(double*) * n);
     for(int i = 0; i < n; ++i)
     {
-        res[i] = calloc(n, sizeof(double));        
+        res[i] = (double*) calloc(n, sizeof(double));        
     }
 
     for(int i = 0; i < n; ++i)
@@ -119,5 +137,7 @@ int main()
         }
     }
     print_matrix(res, n);
+    long double d = determinator(L, U, n);
+    printf("%Lf\n", d * sign);
     return 0;
 }
