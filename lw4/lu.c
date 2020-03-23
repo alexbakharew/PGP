@@ -23,6 +23,26 @@ void transpose(double** matrix, int size)
         }
     }
 }
+double** multiplication(double** lhs, double** rhs, int n)
+{
+    double** res = (double**) malloc(sizeof(double*) * n);
+    for(int i = 0; i < n; ++i)
+    {
+        res[i] = (double*) calloc(n, sizeof(double));        
+    }
+
+    for(int i = 0; i < n; ++i)
+    {
+        for(int j = 0; j < n; ++j)
+        {        
+            for(int t = 0; t < n; ++t)
+            {
+                res[j][i] += lhs[j][t] * rhs[t][i];
+            }
+        }
+    }
+    return res;
+}
 void print_matrix(double** matrix, int size)
 {
     for(int i = 0; i < size; ++i)
@@ -120,22 +140,8 @@ int main()
     printf("LU------------\n");
     print_matrix(U, n);
     printf("multiplication------------\n");
-    double** res = (double**) malloc(sizeof(double*) * n);
-    for(int i = 0; i < n; ++i)
-    {
-        res[i] = (double*) calloc(n, sizeof(double));        
-    }
-
-    for(int i = 0; i < n; ++i)
-    {
-        for(int j = 0; j < n; ++j)
-        {        
-            for(int t = 0; t < n; ++t)
-            {
-                res[j][i] += L[j][t] * U[t][i];
-            }
-        }
-    }
+    
+    double** res = multiplication(L, U, n);
     print_matrix(res, n);
     long double d = determinator(L, U, n);
     printf("%Lf\n", d * sign);
