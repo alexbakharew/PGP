@@ -21,7 +21,7 @@ __global__ void kernel(int *arr, int n) {
 	}
 }
 
-int main() {
+int xmain() {
 	int i, n = 100000000;
 	int *arr = (int *)malloc(sizeof(int) * n);
 	for(i = 0; i < n; i++)

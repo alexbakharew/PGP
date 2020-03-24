@@ -26,9 +26,24 @@ __global__ void scalar(const int* arr1, const int* arr2, const int size, int* re
         tid += offsetx;
     }
 
-    cache[threadIdx.x] = temp;
+	cache[threadIdx.x] = temp;
 
     __syncthreads();
+
+	int i = THREADS_PER_BLOCK / 2;
+
+	while (i > 0)
+	{
+		if(threadIdx.x < i)
+			cache[threadIdx.x] += cache[threadIdx.x + i];
+		__syncthreads();
+		i = i / 2;
+	}
+
+	if (threadIdx.x == 0)
+	{
+		res[blockIdx.x] = cache[0];
+	}
 
     
 }
