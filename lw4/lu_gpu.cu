@@ -1,28 +1,16 @@
 ﻿#include <stdio.h>
 #include <string.h>
+#include <thrust/extrema.h>
+#include <thrust/device_vector.h>
 
-
-//__global__ void gpu_swap(double** matrix, int size, int from_row, int to_row)
-//{
-//	int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//	int offsetx = gridDim.x * blockDim.x;
-//	double temp;
-//	while (idx < size)
-//	{
-//		temp = matrix[from_row][idx];
-//		matrix[from_row][idx] = matrix[to_row][idx];
-//		matrix[to_row][idx] = temp;
-//		idx += offsetx;
-//	}
-//}
-
-__global__ void cpu_swap(double* lhs, double* rhs)
+__host__ void cpu_swap(double* lhs, double* rhs)
 {
 	double tmp = *lhs;
 	*lhs = *rhs;
-	*rhs = tmp;
+    *rhs = tmp;    
 }
-__global__ void сpu_transpose(double* matrix, int size)
+
+__host__ void cpu_transpose(double* matrix, int size)
 {
     for(int i = 0; i < size; ++i)
     {
@@ -32,6 +20,7 @@ __global__ void сpu_transpose(double* matrix, int size)
         }
     }
 }
+
 __global__ void gpu_transpose(double* matrix, int size)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -40,33 +29,13 @@ __global__ void gpu_transpose(double* matrix, int size)
 	double temp;
 	for (j = idx + 1; j < size; ++j)
 	{
-		temp = matrix[idx * size + j];
+        temp = matrix[idx * size + j];
 		matrix[idx * size + j] = matrix[j * size + idx];
 		matrix[j * size + idx] = temp;
-	}
+    }
+    idx += offsetx;
 }
 
-
-//double** gpu_multiplication(double** lhs, double** rhs, int n)
-//{
-//    double** res = (double**) malloc(sizeof(double*) * n);
-//    for(int i = 0; i < n; ++i)
-//    {
-//        res[i] = (double*) calloc(n, sizeof(double));        
-//    }
-//
-//    for(int i = 0; i < n; ++i)
-//    {
-//        for(int j = 0; j < n; ++j)
-//        {        
-//            for(int t = 0; t < n; ++t)
-//            {
-//                res[j][i] += lhs[j][t] * rhs[t][i];
-//            }
-//        }
-//    }
-//    return res;
-//}
 __host__ void gpu_print_matrix(double* matrix, int size)
 {
     for(int i = 0; i < size; ++i)
@@ -78,16 +47,6 @@ __host__ void gpu_print_matrix(double* matrix, int size)
         printf("\n");
     }
 }
-
-//long double gpu_determinator(double** L, double** U, int size)
-//{
-//    long double d = 1;
-//    for(int i = 0; i < size; ++i)
-//    {
-//        d *= L[i][i] * U[i][i];
-//    }
-//    return d;
-//}
 
 int main()
 {
@@ -103,15 +62,20 @@ int main()
 	gpu_print_matrix(matrix, n);
 
 	double* dev_matrix;
-	cudaMalloc(&dev_matrix, sizeof(double) * n);
-	cudaMemcpy(dev_matrix, matrix, sizeof(double) * n, cudaMemcpyHostToDevice);
+	cudaMalloc(&dev_matrix, sizeof(double) * n * n);
+	cudaMemcpy(dev_matrix, matrix, sizeof(double) * n * n, cudaMemcpyHostToDevice);
 
-	//gpu_transpose << <32, 32>> > (dev_matrix, n);
+	gpu_transpose << <32, 32>> > (dev_matrix, n);
 
-	cudaMemcpy(matrix, dev_matrix, sizeof(double) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(matrix, dev_matrix, sizeof(double) * n * n, cudaMemcpyDeviceToHost);
 
-	printf("transposed matrix------------\n");
-	gpu_print_matrix(matrix, n);
+    thrust::device_ptr<double> p_arr = thrust::device_pointer_cast(dev_matrix);
+    thrust::device_ptr<double> res;
+    for(int i = 0; i < n - 1; ++i)
+    {
+        res = thrust::max_element(p_arr + (i * n), p_arr + (i + 1) * n);
+        printf("gpu: %d\n", (int)(res - p_arr));
+    }
 
 
     //double** L = (double**) malloc(sizeof(double*) * n);
