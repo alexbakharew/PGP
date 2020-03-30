@@ -35,7 +35,18 @@ __global__ void gpu_transpose(double* matrix, int size)
     }
     idx += offsetx;
 }
-
+__global__ void gpu_swap(double* matrix, int size, int row_from, int row_to)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsetx = gridDim.x * blockDim.x;
+    double tmp; 
+    for(int i = idx; i < size; i += offsetx)
+    {
+        tmp = matrix[(i * size) + row_from];
+        matrix[(i * size) + row_from] = matrix[(i * size) + row_to];
+        matrix[(i * size) + row_to] = tmp;
+    }
+}
 __host__ void gpu_print_matrix(double* matrix, int size)
 {
     for(int i = 0; i < size; ++i)
@@ -47,6 +58,9 @@ __host__ void gpu_print_matrix(double* matrix, int size)
         printf("\n");
     }
 }
+
+#define THREADS_PER_BLOCK 20
+#define BLOCKS_PER_GRID 20
 
 int main()
 {
@@ -61,35 +75,48 @@ int main()
     printf("matrix------------\n");
 	gpu_print_matrix(matrix, n);
 
-	double* dev_matrix;
-	cudaMalloc(&dev_matrix, sizeof(double) * n * n);
-	cudaMemcpy(dev_matrix, matrix, sizeof(double) * n * n, cudaMemcpyHostToDevice);
+	double* matrix_dev;
+	cudaMalloc(&matrix_dev, sizeof(double) * n * n);
+	cudaMemcpy(matrix_dev, matrix, sizeof(double) * n * n, cudaMemcpyHostToDevice);
 
-	gpu_transpose << <32, 32>> > (dev_matrix, n);
+	gpu_transpose << <32, 32>> > (matrix_dev, n);
 
-	cudaMemcpy(matrix, dev_matrix, sizeof(double) * n * n, cudaMemcpyDeviceToHost);
+    double* L = (double*) malloc(sizeof(double) * n * n);
+    thrust::device_ptr<double> p_matrix = thrust::device_pointer_cast(dev_matrix);
+    thrust::device_ptr<double> max_pos;   
+    int pos;
 
-    thrust::device_ptr<double> p_arr = thrust::device_pointer_cast(dev_matrix);
-    thrust::device_ptr<double> res;
-    for(int i = 0; i < n - 1; ++i)
+    int sign = 1;
+    for(int row = 0; row < n; ++row)
     {
-        res = thrust::max_element(p_arr + (i * n), p_arr + (i + 1) * n);
-        printf("gpu: %d\n", (int)(res - p_arr));
+        max_pos = thrust::max_element(p_matrix + (row * n), p_matrix + (row + 1) * n);
+        pos = (int)(max_pos - p_matrix);
+        if(pos != row)
+        {
+            gpu_swap<<<32, 32>>>(matrix_dev, n, row, pos);
+        }
+        cudaMemcpy(matrix, dev_matrix, sizeof(double) * n * n, cudaMemcpyDeviceToHost);//possible bottle neck
+        for(int col = row; col < n; ++col)
+        {
+            if(col == row)
+            {
+                L[col][col] = 1.0;
+                continue
+            }
+
+            if(matrix[row][row] != 0)
+                L[col][row] = matrix[col][row] / matrix[row][row];
+                
+            else
+            {
+                L[col][row] = 0;
+                continue;
+            }
+
+            LU<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(dev_matrix, size, col, L[col][row]);
+
+        }
     }
-
-
-    //double** L = (double**) malloc(sizeof(double*) * n);
-    //double** U = (double**) malloc(sizeof(double*) * n);
-    //for(int i = 0; i < n; ++i)
-    //{
-    //    L[i] = (double*) calloc(n, sizeof(double));
-    //    U[i] = (double*) malloc(sizeof(double) * n);
-    //    memcpy(U[i], matrix[i], n * sizeof(double));
-    //}
-
-
-
-
    /* int sign = 1;
     for(int col = 0; col < n; ++col)
     {
