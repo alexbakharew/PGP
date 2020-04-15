@@ -63,7 +63,7 @@ long double determinator(double** L, double** U, int size)
     }
     return d;
 }
-int jmain()
+int main()
 {
     int n;
     scanf("%d", &n);
