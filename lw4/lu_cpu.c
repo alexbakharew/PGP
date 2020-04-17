@@ -78,9 +78,9 @@ int main()
     }
 
     //transpose(matrix, n);
-    printf("matrix------------\n");
+    // printf("matrix------------\n");
 
-    print_matrix(matrix, n);
+    // print_matrix(matrix, n);
 
     double** L = (double**) malloc(sizeof(double*) * n);
     double** U = (double**) malloc(sizeof(double*) * n);
@@ -135,14 +135,14 @@ int main()
         }
 
     }
-    printf("------------\n");
-    print_matrix(L, n);
-    printf("LU------------\n");
-    print_matrix(U, n);
-    printf("multiplication------------\n");
+    // printf("------------\n");
+    // print_matrix(L, n);
+    // printf("LU------------\n");
+    // print_matrix(U, n);
+    // printf("multiplication------------\n");
     
-    double** res = multiplication(L, U, n);
-    print_matrix(res, n);
+    // double** res = multiplication(L, U, n);
+    // print_matrix(res, n);
     long double d = determinator(L, U, n);
     printf("%Lf\n", d * sign);
     return 0;

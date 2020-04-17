@@ -3,9 +3,11 @@
 #include <thrust/extrema.h>
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
+#include <math.h>
+#include <float.h>
 
-#define THREADS_PER_BLOCK 20
-#define BLOCKS_PER_GRID 20
+#define THREADS_PER_BLOCK 64
+#define BLOCKS_PER_GRID 64
 
 #define CSC(call)  					\
 do {								\
@@ -117,7 +119,7 @@ __global__ void gpu_compute_L(double* matrix, double* L, int size, int curr_row)
 			L[curr_row * size + curr_row] = 1.0;
 		}
 
-		else if(matrix[curr_row * size + curr_row] != 0)
+		else if(fabs(matrix[curr_row * size + curr_row]) > 10e-7)
 		{
 			L[curr_row * size + idx] = matrix[curr_row * size + idx] / matrix[curr_row * size + curr_row];
 		}
@@ -163,16 +165,16 @@ int main()
 
 	gpu_transpose << <32, 32 >> > (matrix_dev, n);
 
-	cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost);
-	printf("transposed matrix------------\n");
-	gpu_print_matrix(matrix, n);
+	// cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost);
+	// printf("transposed matrix------------\n");
+	// gpu_print_matrix(matrix, n);
 
 	double* L = (double*) calloc(n * n, sizeof(double));
 	double* L_dev;
 	CSC(cudaMalloc(&L_dev, sizeof(double) * n * n));
 	CSC(cudaMemcpy(L_dev, L, sizeof(double) * n * n, cudaMemcpyHostToDevice));
 
-	int* P = (int*) malloc(sizeof(int) * n);
+	//int* P = (int*) malloc(sizeof(int) * n);
 	
 	// printf("jopa");
 
@@ -193,45 +195,49 @@ int main()
 		{
 			sign *= -1;
 			gpu_swap<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>> (matrix_dev, n, row, pos_of_max);
-			CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-			printf("U after swap-----\n");
-			gpu_print_matrix(matrix, n);
+			// CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
+			// printf("U after swap-----\n");
+			// gpu_print_matrix(matrix, n);
 			
 		}
 
 		gpu_compute_L << <BLOCKS_PER_GRID, THREADS_PER_BLOCK >> > (matrix_dev, L_dev, n, row);
-		CSC(cudaMemcpy(L, L_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-		printf("L-----\n");
-		gpu_print_matrix(L, n);
-		getchar();
+		// CSC(cudaMemcpy(L, L_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
+		// printf("L-----\n");
+		// gpu_print_matrix(L, n);
+		// getchar();
 
 		modify_matrix <<< BLOCKS_PER_GRID, THREADS_PER_BLOCK >>> (matrix_dev, L_dev, n, row);
-		CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-		printf("U-----\n");
-		gpu_print_matrix(matrix, n);
-		printf("\n\n");
-		getchar();
-		printf("=====================================\n");
+		// CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
+		// printf("U-----\n");
+		// gpu_print_matrix(matrix, n);
+		// printf("\n\n");
+		// getchar();
+		// printf("=====================================\n");
 
 
 	}
 	CSC(cudaMemcpy(L, L_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
 	CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-	printf("L-----\n");
-	gpu_print_matrix(L, n);
-	printf("matrix-----\n");
-	gpu_print_matrix(matrix, n);
+	// printf("L-----\n");
+	// gpu_print_matrix(L, n);
+	// printf("matrix-----\n");
+	// gpu_print_matrix(matrix, n);
 	
-	double det = 1;
+	long double det = 1;
 
 	for(int i = 0; i < n; ++i)
 	{
 		//printf("p[i] = %d ", P[i]);
-		printf("L[i] = %lg U[i] = %lg\n", L[i * n + i], matrix[i * n + i]);
+		// printf("L[i] = %lg U[i] = %lg\n", L[i * n + i], matrix[i * n + i]);
 		det *= matrix[i * n + i] * L[i * n + i];
 	}
-	printf("\n");
-	printf("det = %f\n", det * sign);
+	// printf("\n");
+	if(fabs(det) <= 10e-7)
+		printf("%.10Lf\n", det);
+	else
+		printf("%.10Lf\n", det * sign);
+
 	//printf("matrix-----\n");
 	//gpu_print_matrix(matrix, n);
 
