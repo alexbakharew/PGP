@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 
 void swap(double* lhs, double* rhs)
 {
@@ -90,7 +91,7 @@ int main()
         U[i] = (double*) malloc(sizeof(double) * n);
         memcpy(U[i], matrix[i], n * sizeof(double));
     }
-
+    clock_t start_time = clock();
     int sign = 1;
     for(int col = 0; col < n; ++col)
     {
@@ -135,6 +136,7 @@ int main()
         }
 
     }
+    printf("CPU time = %.2fms\n", (double)(clock() - start_time) * 1000 /CLOCKS_PER_SEC);
     // printf("------------\n");
     // print_matrix(L, n);
     // printf("LU------------\n");

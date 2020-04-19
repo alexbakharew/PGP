@@ -1,6 +1,6 @@
 nvcc lu_gpu.cu
 
-for i in {0..499}
+for i in {0..19}
 do
     in="./tests/input${i}"
     out="./tests/output${i}"

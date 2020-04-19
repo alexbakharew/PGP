@@ -6,8 +6,8 @@
 #include <math.h>
 #include <float.h>
 
-#define THREADS_PER_BLOCK 64
-#define BLOCKS_PER_GRID 64
+#define THREADS_PER_BLOCK 256
+#define BLOCKS_PER_GRID 256
 
 #define CSC(call)  					\
 do {								\
@@ -18,24 +18,6 @@ do {								\
 		exit(0);					\
 	}								\
 } while(0)
-
-__host__ void cpu_swap(double* lhs, double* rhs)
-{
-	double tmp = *lhs;
-	*lhs = *rhs;
-	*rhs = tmp;
-}
-
-__host__ void cpu_transpose(double* matrix, int size)
-{
-	for (int i = 0; i < size; ++i)
-	{
-		for (int j = i + 1; j < size; ++j)
-		{
-			cpu_swap(&matrix[i * size + j], &matrix[j * size + i]);
-		}
-	}
-}   
 
 __host__ void gpu_print_matrix(double* matrix, int size)
 {
@@ -106,7 +88,7 @@ double* multiplication(double* lhs, double* rhs, int n)
 
 __global__ void gpu_compute_L(double* matrix, double* L, int size, int curr_row)
 {
-	int idx = blockIdx.x * blockDim.x + threadIdx.x;//shift from main diagonal
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	int offsetx = gridDim.x * blockDim.x;
 
 	for(; idx < size; idx += offsetx)
@@ -126,7 +108,7 @@ __global__ void gpu_compute_L(double* matrix, double* L, int size, int curr_row)
 	}
 }
 
-__global__ void modify_matrix(double* matrix, double* L, int size, int max_col)
+__global__ void gpu_modify_matrix(double* matrix, double* L, int size, int max_col)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	int offsetx = gridDim.x * blockDim.x;
@@ -140,12 +122,19 @@ __global__ void modify_matrix(double* matrix, double* L, int size, int max_col)
 			continue;
 		else
 		{
-			//matrix[idx] -= L[max_col * size + curr_col] * matrix[curr_row * size + max_col];
 			matrix[curr_row * size + curr_col] -= L[max_col * size + curr_col] * matrix[curr_row * size + max_col];
-			
 		}
 	}
 }
+
+struct comparator
+{
+	__host__ __device__ bool operator()(double lhs, double rhs)
+	{
+		return fabs(lhs) < fabs(rhs);
+	} 
+};
+
 int main()
 {
 	int n;
@@ -159,87 +148,64 @@ int main()
 	CSC(cudaMalloc(&matrix_dev, sizeof(double) * n * n));
 	CSC(cudaMemcpy(matrix_dev, matrix, sizeof(double) * n * n, cudaMemcpyHostToDevice));
 
-	// printf("matrix------------\n");
-	// gpu_print_matrix(matrix, n);
-	// printf("\n");
-
-	gpu_transpose << <32, 32 >> > (matrix_dev, n);
-
-	// cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost);
-	// printf("transposed matrix------------\n");
-	// gpu_print_matrix(matrix, n);
-
+	
 	double* L = (double*) calloc(n * n, sizeof(double));
 	double* L_dev;
 	CSC(cudaMalloc(&L_dev, sizeof(double) * n * n));
 	CSC(cudaMemcpy(L_dev, L, sizeof(double) * n * n, cudaMemcpyHostToDevice));
-
-	//int* P = (int*) malloc(sizeof(int) * n);
 	
-	// printf("jopa");
-
-	// thrust::device_ptr<double> max_elem;
 	int pos_of_max;
 	int sign = 1;
-	// getchar();
+	comparator comp;
+	thrust::device_ptr<double> p_matrix = thrust::device_pointer_cast(matrix_dev);
+	thrust::device_ptr<double> max_elem;
+
+	cudaEvent_t start, end;
+	CSC(cudaEventCreate(&start));
+	CSC(cudaEventCreate(&end));
+	CSC(cudaEventRecord(start));
+
+	gpu_transpose << <BLOCKS_PER_GRID, THREADS_PER_BLOCK >> > (matrix_dev, n);
 
 	for (int row = 0; row < n; ++row)
 	{
-		thrust::device_ptr<double> p_matrix = thrust::device_pointer_cast(matrix_dev);
-		thrust::device_ptr<double> max_elem = thrust::max_element(p_matrix + (row * n) + row, p_matrix + ((row + 1) * n));
+		max_elem = thrust::max_element(p_matrix + (row * n) + row, p_matrix + ((row + 1) * n), comp);
 		pos_of_max = (int)(max_elem - p_matrix) % n;
-		//printf("%d\n", pos_of_max);
-		//P[row] = pos_of_max;
 
 		if(row != pos_of_max)
 		{
 			sign *= -1;
 			gpu_swap<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>> (matrix_dev, n, row, pos_of_max);
-			// CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-			// printf("U after swap-----\n");
-			// gpu_print_matrix(matrix, n);
-			
 		}
 
 		gpu_compute_L << <BLOCKS_PER_GRID, THREADS_PER_BLOCK >> > (matrix_dev, L_dev, n, row);
-		// CSC(cudaMemcpy(L, L_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-		// printf("L-----\n");
-		// gpu_print_matrix(L, n);
-		// getchar();
-
-		modify_matrix <<< BLOCKS_PER_GRID, THREADS_PER_BLOCK >>> (matrix_dev, L_dev, n, row);
-		// CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-		// printf("U-----\n");
-		// gpu_print_matrix(matrix, n);
-		// printf("\n\n");
-		// getchar();
-		// printf("=====================================\n");
-
-
+		gpu_modify_matrix <<< BLOCKS_PER_GRID, THREADS_PER_BLOCK >>> (matrix_dev, L_dev, n, row);
 	}
+	//
+	CSC(cudaEventRecord(end));
+	CSC(cudaEventSynchronize(end));
+	float t;
+	CSC(cudaEventElapsedTime(&t, start, end));
+	CSC(cudaEventDestroy(start));
+	CSC(cudaEventDestroy(end));
+	printf("GPU time = %.2fms\n", t);
+
 	CSC(cudaMemcpy(L, L_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
 	CSC(cudaMemcpy(matrix, matrix_dev, sizeof(double) * n * n, cudaMemcpyDeviceToHost));
-	// printf("L-----\n");
-	// gpu_print_matrix(L, n);
-	// printf("matrix-----\n");
-	// gpu_print_matrix(matrix, n);
 	
 	long double det = 1;
-
 	for(int i = 0; i < n; ++i)
 	{
-		//printf("p[i] = %d ", P[i]);
-		// printf("L[i] = %lg U[i] = %lg\n", L[i * n + i], matrix[i * n + i]);
 		det *= matrix[i * n + i] * L[i * n + i];
 	}
-	// printf("\n");
 	if(fabs(det) <= 10e-7)
 		printf("%.10Lf\n", det);
+
 	else
 		printf("%.10Lf\n", det * sign);
 
-	//printf("matrix-----\n");
-	//gpu_print_matrix(matrix, n);
-
-
+	free(matrix);
+	free(L);
+	cudaFree(matrix_dev);	
+	cudaFree(L_dev);
 }
