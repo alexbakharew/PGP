@@ -1,7 +1,6 @@
 #include <stdio.h>
-#include <memory>
-#include "solver.h"
-#include <iostream>
+#include "mpi.h"
+
 int main(int argc, char** argv)
 {
     int proc_count_x, proc_count_y, proc_count_z;
@@ -20,14 +19,5 @@ int main(int argc, char** argv)
     scanf("%lf %lf %lf %lf %lf %lf", &u_down, &u_up, &u_left, &u_right, &u_front, &u_back);
     scanf("%lf", &u_0);
 
-    Jacobi::Solver s;
-    s.InitMesh(l_x, l_y, l_z, block_size_x, block_size_y, block_size_z);
-    s.InitInitialCondition(u_down, u_up, u_left, u_right, u_front, u_back, u_0);
-    s.PrintMesh();
-    //s.Solve(eps);
-    if(s.SaveResults(output_file))
-        std::cout << "OK" << std::endl;
-    else    
-        std::cout << "BAD" << std::endl;
     
 }
